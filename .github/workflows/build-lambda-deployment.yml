@@ -1,0 +1,49 @@
+name: Build AWS Lambda deployment ZIP
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/build-lambda-deployment.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-lambda:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package.json
+
+      - name: Install production dependencies
+        working-directory: backend
+        run: npm install --omit=dev
+
+      - name: Run backend tests
+        working-directory: backend
+        run: npm test
+
+      - name: Build Lambda ZIP from current source
+        working-directory: backend
+        run: |
+          zip -qr ../joy-inbox-lambda-latest.zip index.js src node_modules
+          unzip -l ../joy-inbox-lambda-latest.zip | head -80
+
+      - name: Upload versioned deployment package
+        uses: actions/upload-artifact@v4
+        with:
+          name: joy-inbox-lambda-${{ github.sha }}
+          path: joy-inbox-lambda-latest.zip
+          if-no-files-found: error
+          retention-days: 30
